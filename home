@@ -1,0 +1,128 @@
+import React, { useState, useEffect } from "react";
+import { Banner, Product, Category } from "@/entities/all";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { ChevronRight, Star, Eye, Search } from "lucide-react";
+
+import HeroBanner from "../components/home/HeroBanner";
+import CategoryGrid from "../components/home/CategoryGrid";
+import ProductGrid from "../components/home/ProductGrid";
+import SearchBar from "../components/home/SearchBar";
+
+export default function Home() {
+  const [banners, setBanners] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [bannersData, categoriesData, productsData] = await Promise.all([
+        Banner.filter({ status: "active" }, "sort_order", 10),
+        Category.list("sort_order", 8),
+        Product.filter({ status: "active" }, "-created_date", 20)
+      ]);
+
+      setBanners(bannersData);
+      setCategories(categoriesData);
+      setProducts(productsData);
+      setFeaturedProducts(productsData.filter(p => p.featured).slice(0, 6));
+    } catch (error) {
+      console.error("加载数据失败:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProducts = searchQuery
+    ? products.filter(product =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : products;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-orange-50 to-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-gray-50">
+      {/* 顶部搜索栏 */}
+      <div className="bg-white/80 backdrop-blur-sm sticky top-0 z-40 border-b border-gray-100">
+        <div className="px-4 py-3">
+          <SearchBar 
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* 轮播图 */}
+        {banners.length > 0 && (
+          <HeroBanner banners={banners} />
+        )}
+
+        {/* 分类导航 */}
+        {categories.length > 0 && (
+          <section className="px-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">商品分类</h2>
+              <Link 
+                to={createPageUrl("Categories")}
+                className="text-orange-500 text-sm flex items-center gap-1 hover:text-orange-600"
+              >
+                查看全部 <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <CategoryGrid categories={categories.slice(0, 8)} />
+          </section>
+        )}
+
+        {/* 推荐商品 */}
+        {featuredProducts.length > 0 && (
+          <section className="px-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Star className="w-5 h-5 text-orange-500 fill-current" />
+              <h2 className="text-xl font-bold text-gray-900">精选推荐</h2>
+            </div>
+            <ProductGrid products={featuredProducts} featured />
+          </section>
+        )}
+
+        {/* 全部商品 */}
+        <section className="px-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Eye className="w-5 h-5 text-gray-600" />
+            <h2 className="text-xl font-bold text-gray-900">
+              {searchQuery ? `搜索结果 (${filteredProducts.length})` : '全部商品'}
+            </h2>
+          </div>
+          
+          {filteredProducts.length > 0 ? (
+            <ProductGrid products={filteredProducts} />
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                <Search className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-gray-500">
+                {searchQuery ? '未找到相关商品' : '暂无商品'}
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
